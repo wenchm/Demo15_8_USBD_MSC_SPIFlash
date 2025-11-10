@@ -6,8 +6,8 @@ git init
 git add README.md
 git commit -m "first commit"
 git branch -M master
-git remote -v
 git remote add origin https://github.com/wenchm/Demo15_8_USBD_MSC_SPIFlash.git
+git remote -v
 
 git push -u origin master
 

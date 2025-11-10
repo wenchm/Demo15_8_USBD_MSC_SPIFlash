@@ -1,0 +1,15 @@
+../Core/Src/main.c:101:10:W25Qxx_ReadID	16	static
+../Core/Src/main.c:136:9:W25Qxx_ReadSR	24	static
+../Core/Src/main.c:168:6:W25Qxx_Write_Enable	8	static
+../Core/Src/main.c:181:6:W25Qxx_Write_Disable	8	static
+../Core/Src/main.c:196:6:W25Qxx_Read	40	static
+../Core/Src/main.c:225:6:W25Qxx_Write_Page	32	static
+../Core/Src/main.c:255:6:W25Qxx_Write_NoCheck	32	static
+../Core/Src/main.c:286:6:W25Qxx_Write	40	static
+../Core/Src/main.c:337:6:W25Qxx_Erase_Sector	16	static
+../Core/Src/main.c:362:6:W25Qxx_Wait_Busy	8	static
+../Core/Src/main.c:372:9:SPI2_ReadWriteByte	32	static
+../Core/Src/main.c:677:5:main	8	static
+../Core/Src/main.c:725:6:SystemClock_Config	88	static
+../Core/Src/main.c:768:5:__io_putchar	16	static
+../Core/Src/main.c:779:6:Error_Handler	4	static,ignoring_inline_asm
