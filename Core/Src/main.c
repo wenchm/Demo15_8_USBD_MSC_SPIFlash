@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "rtc.h"
 #include "spi.h"
 #include "usart.h"
 #include "usb_device.h"
@@ -45,6 +44,7 @@
 #define W25Q256 0XEF18
 
 // instruction set, comes from DATASHEET.
+// not each specification have such below instruction.
 #define W25Qxx_WriteEnable			0x06
 #define W25Qxx_WriteDisable			0x04
 #define W25Qxx_ReadStatusReg1		0x05
@@ -103,24 +103,23 @@ uint8_t SPI_ReadWriteByte(uint8_t TxData);
   * @param  void
   * @retval uint16_t Temp:
   */
-uint16_t W25Qxx_TYPE;					//define W25Qxx type
+uint16_t W25Qxx_TYPE;							//define W25Qxx type
 uint16_t W25Qxx_ReadID(void)
 {
 	uint16_t Temp = 0;
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);// enable CS,Low level active.
-//	SPI_ReadWriteByte(0x90);			//sent read ID cmd
-	SPI_ReadWriteByte(W25Qxx_ManufactDeviceID);
-	SPI_ReadWriteByte(0x00);
-	SPI_ReadWriteByte(0x00);
-	SPI_ReadWriteByte(0x00);
-	Temp|=SPI_ReadWriteByte(0xFF)<<8;
-	Temp|=SPI_ReadWriteByte(0xFF);
+//	SPI_ReadWriteByte(0x90);					//sent read ID cmd
+	SPI_ReadWriteByte(W25Qxx_ManufactDeviceID);	//BYTE1=90h,instruction code
+	SPI_ReadWriteByte(0x00);					//BYTE2
+	SPI_ReadWriteByte(0x00);					//BYTE3
+	SPI_ReadWriteByte(0x00);					//BYTE4,return 00h
+	Temp|=SPI_ReadWriteByte(0xFF)<<8;			//BYTE5,return efh,high 8bit
+	Temp|=SPI_ReadWriteByte(0xFF);				//BYTE6,return 14h
 	W25Qxx_TYPE=Temp;
+	printf("FLASH SPECIFICATION IS :%x\r\n",W25Qxx_TYPE);	//test
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);	// disable CS
 	return Temp;
 }
-
-//printf("FLASH SPECIFICATION IS :%d\r\n",W25Qxx_TYPE);	//test
 
 /**
   * @brief  W25Qxx Read SR
@@ -148,7 +147,7 @@ uint8_t W25Qxx_ReadSR(uint8_t regno)
     switch(regno)
     {
         case 1:
-            command=W25Qxx_ReadStatusReg1;    // read SR1
+            command=W25Qxx_ReadStatusReg1;    // read SR1,0x05
             break;
         case 2:
             command=W25Qxx_ReadStatusReg2;    // read SR2
@@ -161,8 +160,9 @@ uint8_t W25Qxx_ReadSR(uint8_t regno)
             break;
     }
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);// enable CS
-	SPI_ReadWriteByte(command);            // sent read SR CMD
-	byte=SPI_ReadWriteByte(0Xff);          // read one byte
+	SPI_ReadWriteByte(command);            	// BYTE1=05h,sent read SR CMD
+	byte=SPI_ReadWriteByte(0Xff);          	// BYTE2,return SR1
+	printf("FLASH SR1 :%d\r\n",byte);		// test
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);	// disable CS
 	return byte;
 }
@@ -349,17 +349,17 @@ void W25Qxx_Erase_Sector(uint32_t Dst_Addr)
  	Dst_Addr*=4096;
     W25Qxx_Write_Enable();                  					// SET WEL
     W25Qxx_Wait_Busy();
-  	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);	//enable CS
+  	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);
     SPI_ReadWriteByte(W25Qxx_SectorErase);   					// Send erase sector CMD
     if(W25Qxx_TYPE==W25Q256)                					// If W25Q256, the address is 4 bytes, the highest 8 bits need to be sent.
     {
         SPI_ReadWriteByte((uint8_t)((Dst_Addr)>>24));
     }
-    SPI_ReadWriteByte((uint8_t)((Dst_Addr)>>16));  			// sent 24bit addr
+    SPI_ReadWriteByte((uint8_t)((Dst_Addr)>>16));  				// sent 24bit addr
     SPI_ReadWriteByte((uint8_t)((Dst_Addr)>>8));
     SPI_ReadWriteByte((uint8_t)Dst_Addr);
 
-	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);		// disable CS
+	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);
     W25Qxx_Wait_Busy();   				    					// Waiting for erase completion
 }
 
@@ -374,9 +374,10 @@ void W25Qxx_Wait_Busy(void)
 }
 
 /**
-  * @brief  SPI read and write a byte in block mode
-  * @param  TxData: Bytes to be written
-  * @retval Rxdata: Bytes read
+  * @brief  write CMD into flash and then return a value,in block mode
+  * 		either a byte is written or a byte is returned.
+  * @param  TxData: bytes written
+  * @retval Rxdata: bytes to be return
   */
 uint8_t SPI_ReadWriteByte(uint8_t TxData)
 {
@@ -408,11 +409,11 @@ uint8_t SPI_ReadWriteByte(uint8_t TxData)
 //}
 
 /**
- * @brief   SPI在发送数据的同时接收指定长度的数�?
- * @param   send_buf  —�?? 接收数据缓冲区首地址
- * @param   recv_buf  —�?? 接收数据缓冲区首地址
- * @param   size —�?? 要发�?/接收数据的字节数
- * @retval  成功返回HAL_OK
+ * @brief   SPI transmit data while receiving a specified length of data.
+ * @param   send_buf:sent buffer start address
+ * @param   recv_buf:receive buffer start address
+ * @param   size:the bytes to be sent/received
+ * @retval  HAL_OK
  */
 //static HAL_StatusTypeDef SPI_TransmitReceive(uint8_t* send_buf, uint8_t* recv_buf, uint16_t size)
 //{
@@ -420,20 +421,16 @@ uint8_t SPI_ReadWriteByte(uint8_t TxData)
 //}
 
 /**
- * @brief   读取Flash内部的ID
+ * @brief   read Flash ID
  * @param   none
- * @retval  成功返回device_id
+ * @retval  device_id
  */
 //uint16_t W25Qxx_ReadID(void)
 //{
 //    uint8_t recv_buf[2] = {0};    //recv_buf[0]存放Manufacture ID, recv_buf[1]存放Device ID
 //    uint16_t device_id = 0;
-//    uint8_t send_data[4] = {ManufactDeviceID_CMD,0x00,0x00,0x00};   //待发送数据，命令+地址
-//
-//    /* 使能片�?? */
+//    uint8_t send_data[4] = {ManufactDeviceID_CMD,0x00,0x00,0x00};
 //    HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);
-//
-//    /* 发�?�并读取数据 */
 //    if (HAL_OK == SPI_Transmit(send_data, 4))
 //    {
 //        if (HAL_OK == SPI_Receive(recv_buf, 2))
@@ -441,17 +438,14 @@ uint8_t SPI_ReadWriteByte(uint8_t TxData)
 //            device_id = (recv_buf[0] << 8) | recv_buf[1];
 //        }
 //    }
-//
-//    /* 取消片�?? */
 //    HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);
-//
 //    return device_id;
 //}
 
 /**
- * @brief     读取W25Qxx的状态寄存器，W25Qxx�?共有2个状态寄存器
- * @param     reg  —�?? 状�?�寄存器编号(1~2)
- * @retval    状�?�寄存器的�??
+ * @brief     read W25Qxx SR
+ * @param     reg: SR1 or SR2
+ * @retval    0
  */
 //uint8_t W25Qxx_ReadSR(uint8_t reg)
 //{
@@ -467,8 +461,7 @@ uint8_t SPI_ReadWriteByte(uint8_t TxData)
 //        default:
 //            send_buf[0] = READ_STATU_REGISTER_1;
 //    }
-//
-//     /* 使能片�?? */
+
 //    HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);
 //
 //    if (HAL_OK == SPI_Transmit(send_buf, 4))
@@ -480,8 +473,7 @@ uint8_t SPI_ReadWriteByte(uint8_t TxData)
 //            return result;
 //        }
 //    }
-//
-//    /* 取消片�?? */
+
 //    HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);
 //    return 0;
 //}
@@ -708,7 +700,6 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_RTC_Init();
   MX_SPI2_Init();
   MX_USART6_UART_Init();
   MX_USB_DEVICE_Init();
@@ -744,9 +735,8 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 25;
