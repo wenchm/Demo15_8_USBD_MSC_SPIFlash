@@ -26,7 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,6 +36,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+// flash specification
 #define W25Q80 	0XEF13
 #define W25Q16 	0XEF14
 #define W25Q32 	0XEF15
@@ -43,28 +44,29 @@
 #define W25Q128	0XEF17
 #define W25Q256 0XEF18
 
-#define W25X_WriteEnable		0x06
-#define W25X_WriteDisable		0x04
-#define W25X_ReadStatusReg1		0x05
-#define W25X_ReadStatusReg2		0x35
-#define W25X_ReadStatusReg3		0x15
-#define W25X_WriteStatusReg1    0x01
-#define W25X_WriteStatusReg2    0x31
-#define W25X_WriteStatusReg3    0x11
-#define W25X_ReadData			0x03
-#define W25X_FastReadData		0x0B
-#define W25X_FastReadDual		0x3B
-#define W25X_PageProgram		0x02
-#define W25X_BlockErase			0xD8
-#define W25X_SectorErase		0x20
-#define W25X_ChipErase			0xC7
-#define W25X_PowerDown			0xB9
-#define W25X_ReleasePowerDown	0xAB
-#define W25X_DeviceID			0xAB
-#define W25X_ManufactDeviceID	0x90
-#define W25X_JedecDeviceID		0x9F
-#define W25X_Enable4ByteAddr    0xB7
-#define W25X_Exit4ByteAddr      0xE9
+// instruction set, comes from DATASHEET.
+#define W25Qxx_WriteEnable			0x06
+#define W25Qxx_WriteDisable			0x04
+#define W25Qxx_ReadStatusReg1		0x05
+#define W25Qxx_ReadStatusReg2		0x35
+#define W25Qxx_ReadStatusReg3		0x15
+#define W25Qxx_WriteStatusReg1  	0x01
+#define W25Qxx_WriteStatusReg2  	0x31
+#define W25Qxx_WriteStatusReg3  	0x11
+#define W25Qxx_ReadData				0x03
+#define W25Qxx_FastReadData			0x0B
+#define W25Qxx_FastReadDual			0x3B
+#define W25Qxx_PageProgram			0x02
+#define W25Qxx_BlockErase			0xD8
+#define W25Qxx_SectorErase			0x20
+#define W25Qxx_ChipErase			0xC7
+#define W25Qxx_PowerDown			0xB9
+#define W25Qxx_ReleasePowerDown		0xAB
+#define W25Qxx_DeviceID				0xAB
+#define W25Qxx_ManufactDeviceID		0x90
+#define W25Qxx_JedecDeviceID		0x9F
+#define W25Qxx_Enable4ByteAddr    	0xB7
+#define W25Qxx_Exit4ByteAddr      	0xE9
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -91,27 +93,34 @@ void W25Qxx_Read(uint8_t* pBuffer,uint32_t ReadAddr,uint16_t NumByteToRead);   /
 void W25Qxx_Write(uint8_t* pBuffer,uint32_t WriteAddr,uint16_t NumByteToWrite);//write flash
 void W25Qxx_Erase_Sector(uint32_t Dst_Addr);	//sector erase
 void W25Qxx_Wait_Busy(void);           			//wait for Idle
-uint8_t SPI2_ReadWriteByte(uint8_t TxData);
+uint8_t SPI_ReadWriteByte(uint8_t TxData);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//initial SPI FLASH IO
+/**
+  * @brief  read W25Qxx ID
+  * @param  void
+  * @retval uint16_t Temp:
+  */
 uint16_t W25Qxx_TYPE;					//define W25Qxx type
 uint16_t W25Qxx_ReadID(void)
 {
 	uint16_t Temp = 0;
-	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);// enable CS
-	SPI2_ReadWriteByte(0x90);			//sent read ID cmd
-	SPI2_ReadWriteByte(0x00);
-	SPI2_ReadWriteByte(0x00);
-	SPI2_ReadWriteByte(0x00);
-	Temp|=SPI2_ReadWriteByte(0xFF)<<8;
-	Temp|=SPI2_ReadWriteByte(0xFF);
+	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);// enable CS,Low level active.
+//	SPI_ReadWriteByte(0x90);			//sent read ID cmd
+	SPI_ReadWriteByte(W25Qxx_ManufactDeviceID);
+	SPI_ReadWriteByte(0x00);
+	SPI_ReadWriteByte(0x00);
+	SPI_ReadWriteByte(0x00);
+	Temp|=SPI_ReadWriteByte(0xFF)<<8;
+	Temp|=SPI_ReadWriteByte(0xFF);
 	W25Qxx_TYPE=Temp;
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);	// disable CS
 	return Temp;
 }
+
+//printf("FLASH SPECIFICATION IS :%d\r\n",W25Qxx_TYPE);	//test
 
 /**
   * @brief  W25Qxx Read SR
@@ -139,21 +148,21 @@ uint8_t W25Qxx_ReadSR(uint8_t regno)
     switch(regno)
     {
         case 1:
-            command=W25X_ReadStatusReg1;    // read SR1
+            command=W25Qxx_ReadStatusReg1;    // read SR1
             break;
         case 2:
-            command=W25X_ReadStatusReg2;    // read SR2
+            command=W25Qxx_ReadStatusReg2;    // read SR2
             break;
         case 3:
-            command=W25X_ReadStatusReg3;    // read SR3
+            command=W25Qxx_ReadStatusReg3;    // read SR3
             break;
         default:
-            command=W25X_ReadStatusReg1;
+            command=W25Qxx_ReadStatusReg1;
             break;
     }
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);// enable CS
-	SPI2_ReadWriteByte(command);            // sent read SR CMD
-	byte=SPI2_ReadWriteByte(0Xff);          // read one byte
+	SPI_ReadWriteByte(command);            // sent read SR CMD
+	byte=SPI_ReadWriteByte(0Xff);          // read one byte
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);	// disable CS
 	return byte;
 }
@@ -168,7 +177,7 @@ uint8_t W25Qxx_ReadSR(uint8_t regno)
 void W25Qxx_Write_Enable(void)
 {
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);	//enable CS
-    SPI2_ReadWriteByte(W25X_WriteEnable);   													//sent write enable CMD
+    SPI_ReadWriteByte(W25Qxx_WriteEnable);   													//sent write enable CMD
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);		//disable CS
 }
 
@@ -181,7 +190,7 @@ void W25Qxx_Write_Enable(void)
 void W25Qxx_Write_Disable(void)
 {
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);    // disable CS
-    SPI2_ReadWriteByte(W25X_WriteDisable);  													// sent write disable CMD
+    SPI_ReadWriteByte(W25Qxx_WriteDisable);  													// sent write disable CMD
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);      // enable CS
 }
 
@@ -197,17 +206,17 @@ void W25Qxx_Read(uint8_t* pBuffer,uint32_t ReadAddr,uint16_t NumByteToRead)
 {
  	uint16_t i;
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);	// enable CS
-    SPI2_ReadWriteByte(W25X_ReadData);      													// 发送读取命令
-    if(W25Qxx_TYPE==W25Q256)                													// 如果是W25Q256的话地址为4字节的，要发送最高8位
+    SPI_ReadWriteByte(W25Qxx_ReadData);      													// sent read CMD
+    if(W25Qxx_TYPE==W25Q256)                													// if W25Q256 addr is 4 bytes，sent up to 8 bit.
     {
-        SPI2_ReadWriteByte((uint8_t)((ReadAddr)>>24));
+        SPI_ReadWriteByte((uint8_t)((ReadAddr)>>24));
     }
-    SPI2_ReadWriteByte((uint8_t)((ReadAddr)>>16));   											// sent 24bit addr
-    SPI2_ReadWriteByte((uint8_t)((ReadAddr)>>8));
-    SPI2_ReadWriteByte((uint8_t)ReadAddr);
+    SPI_ReadWriteByte((uint8_t)((ReadAddr)>>16));   											// sent 24bit addr
+    SPI_ReadWriteByte((uint8_t)((ReadAddr)>>8));
+    SPI_ReadWriteByte((uint8_t)ReadAddr);
     for(i=0;i<NumByteToRead;i++)
 	{
-        pBuffer[i]=SPI2_ReadWriteByte(0XFF);    												// Circular reading
+        pBuffer[i]=SPI_ReadWriteByte(0XFF);    													// Circular reading
     }
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);		// disable CS
 }
@@ -219,7 +228,7 @@ void W25Qxx_Read(uint8_t* pBuffer,uint32_t ReadAddr,uint16_t NumByteToRead)
   * 		Write up to 256 bytes of data starting at the specified address
   * @param  pBuffer:Data storage area
   * 		WriteAddr:Starting address(24bit)
-  * 		NumByteToWrite:The bytes to be written(最大256),The size should not exceed the remaining bytes of the page.
+  * 		NumByteToWrite:The bytes to be written(max 256),The size should not exceed the remaining bytes of the page.
   * @retval void
   */
 void W25Qxx_Write_Page(uint8_t* pBuffer,uint32_t WriteAddr,uint16_t NumByteToWrite)
@@ -227,15 +236,15 @@ void W25Qxx_Write_Page(uint8_t* pBuffer,uint32_t WriteAddr,uint16_t NumByteToWri
  	uint16_t i;
     W25Qxx_Write_Enable();                  													// SET WEL
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);	// enable CS
-    SPI2_ReadWriteByte(W25X_PageProgram);														// sent write page CMD
+    SPI_ReadWriteByte(W25Qxx_PageProgram);														// sent write page CMD
     if(W25Qxx_TYPE==W25Q256)                													// If W25Q256, the address is 4 bytes, and the highest 8 bits need to be sent.
     {
-        SPI2_ReadWriteByte((uint8_t)((WriteAddr)>>24));
+        SPI_ReadWriteByte((uint8_t)((WriteAddr)>>24));
     }
-    SPI2_ReadWriteByte((uint8_t)((WriteAddr)>>16)); 											// sent 24bit addr
-    SPI2_ReadWriteByte((uint8_t)((WriteAddr)>>8));
-    SPI2_ReadWriteByte((uint8_t)WriteAddr);
-    for(i=0;i<NumByteToWrite;i++)SPI2_ReadWriteByte(pBuffer[i]);								// Circular writing
+    SPI_ReadWriteByte((uint8_t)((WriteAddr)>>16)); 												// sent 24bit addr
+    SPI_ReadWriteByte((uint8_t)((WriteAddr)>>8));
+    SPI_ReadWriteByte((uint8_t)WriteAddr);
+    for(i=0;i<NumByteToWrite;i++)SPI_ReadWriteByte(pBuffer[i]);									// Circular writing
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);    	// disable CS
 	W25Qxx_Wait_Busy();					   														// Waiting for write completion
 }
@@ -261,7 +270,7 @@ void W25Qxx_Write_NoCheck(uint8_t* pBuffer,uint32_t WriteAddr,uint16_t NumByteTo
 	{
 		W25Qxx_Write_Page(pBuffer,WriteAddr,pageremain);
 		if(NumByteToWrite==pageremain)break;					// Finished writing.
-	 	else //NumByteToWrite>page remain
+	 	else 													//NumByteToWrite>page remain
 		{
 			pBuffer+=pageremain;
 			WriteAddr+=pageremain;
@@ -341,14 +350,14 @@ void W25Qxx_Erase_Sector(uint32_t Dst_Addr)
     W25Qxx_Write_Enable();                  					// SET WEL
     W25Qxx_Wait_Busy();
   	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_RESET);	//enable CS
-    SPI2_ReadWriteByte(W25X_SectorErase);   					// Send erase sector CMD
+    SPI_ReadWriteByte(W25Qxx_SectorErase);   					// Send erase sector CMD
     if(W25Qxx_TYPE==W25Q256)                					// If W25Q256, the address is 4 bytes, the highest 8 bits need to be sent.
     {
-        SPI2_ReadWriteByte((uint8_t)((Dst_Addr)>>24));
+        SPI_ReadWriteByte((uint8_t)((Dst_Addr)>>24));
     }
-    SPI2_ReadWriteByte((uint8_t)((Dst_Addr)>>16));  			// sent 24bit addr
-    SPI2_ReadWriteByte((uint8_t)((Dst_Addr)>>8));
-    SPI2_ReadWriteByte((uint8_t)Dst_Addr);
+    SPI_ReadWriteByte((uint8_t)((Dst_Addr)>>16));  			// sent 24bit addr
+    SPI_ReadWriteByte((uint8_t)((Dst_Addr)>>8));
+    SPI_ReadWriteByte((uint8_t)Dst_Addr);
 
 	HAL_GPIO_WritePin(W25Qxx_CHIP_SELECT_GPIO_Port, W25Qxx_CHIP_SELECT_Pin, GPIO_PIN_SET);		// disable CS
     W25Qxx_Wait_Busy();   				    					// Waiting for erase completion
@@ -365,11 +374,11 @@ void W25Qxx_Wait_Busy(void)
 }
 
 /**
-  * @brief  SPI read and write a byte
+  * @brief  SPI read and write a byte in block mode
   * @param  TxData: Bytes to be written
   * @retval Rxdata: Bytes read
   */
-uint8_t SPI2_ReadWriteByte(uint8_t TxData)
+uint8_t SPI_ReadWriteByte(uint8_t TxData)
 {
 	uint8_t Rxdata;
     HAL_SPI_TransmitReceive(&hspi2,&TxData,&Rxdata,1, 1000);
@@ -384,7 +393,7 @@ uint8_t SPI2_ReadWriteByte(uint8_t TxData)
  */
 //static HAL_StatusTypeDef SPI_Transmit(uint8_t* send_buf, uint16_t size)
 //{
-//    return HAL_SPI_Transmit(&hspi1, send_buf, size, 100);
+//    return HAL_SPI_Transmit(&hspi2, send_buf, size, 100);
 //}
 
 /**
@@ -395,7 +404,7 @@ uint8_t SPI2_ReadWriteByte(uint8_t TxData)
  */
 //static HAL_StatusTypeDef SPI_Receive(uint8_t* recv_buf, uint16_t size)
 //{
-//   return HAL_SPI_Receive(&hspi1, recv_buf, size, 100);
+//   return HAL_SPI_Receive(&hspi2, recv_buf, size, 100);
 //}
 
 /**
@@ -407,7 +416,7 @@ uint8_t SPI2_ReadWriteByte(uint8_t TxData)
  */
 //static HAL_StatusTypeDef SPI_TransmitReceive(uint8_t* send_buf, uint8_t* recv_buf, uint16_t size)
 //{
-//   return HAL_SPI_TransmitReceive(&hspi1, send_buf, recv_buf, size, 100);
+//   return HAL_SPI_TransmitReceive(&hspi2, send_buf, recv_buf, size, 100);
 //}
 
 /**
