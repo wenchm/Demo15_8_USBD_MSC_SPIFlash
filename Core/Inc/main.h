@@ -59,8 +59,6 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define W25Qxx_CHIP_SELECT_Pin GPIO_PIN_13
 #define W25Qxx_CHIP_SELECT_GPIO_Port GPIOC
-#define KEY1_Pin GPIO_PIN_2
-#define KEY1_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
